@@ -9,6 +9,8 @@ from datetime import datetime
 from dotenv import load_dotenv
 import proxmox
 import truenas
+import json
+import subprocess
 
 load_dotenv(os.path.expanduser('~/python-scripts/.proxmox.env'))
 DISCORD_WEBHOOK = os.getenv('DISCORD_WEBHOOK')
@@ -28,6 +30,33 @@ def send_discord(message, color):
         }
     )
 
+#-------------SPEEDTEST------------------------------
+def get_speedtest():
+    '''Run speedtest and return result'''
+    try:
+        result = subprocess.run(
+            ['speedtest-cli' , '--json'],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+
+        if result.returncode == 0:
+            data = json.loads(result.stdout)
+            return {
+                'download': round(data['download'] / 1_000_000, 2),
+                'upload': round(data['upload'] / 1_000_000, 2),
+                'ping': round(data['ping'], 2),
+                'server': data['server']['sponsor']
+            }
+        else:
+            return None
+    except Exception as e:
+        print(f"Speedtest error: {e}")
+        return None
+
+
+    
 
 # -------------FETCH DATA   ----------------------------
 
@@ -61,6 +90,17 @@ Drives: {drive_status}
 """
 
 color = 65280 if all_clear else 16711680
+# Get speed test
+speed = get_speedtest()
+
+if speed:
+    message += f"\n**📊 Network Speed**\n"
+    message += f"Download: {speed['download']} Mbps\n"
+    message += f"Upload: {speed['upload']} Mbps\n"
+    message += f"Ping: {speed['ping']} ms\n"
+    message += f"Server: {speed['server']}\n"
+else:
+    message += f"\n⚠️ Speed test failed\n"
 
 # ── OUTPUT ────────────────────────────────────────────
 print(message)
